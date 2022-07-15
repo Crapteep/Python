@@ -1,4 +1,3 @@
-import time
 import requests
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
@@ -11,25 +10,21 @@ from config import *
 adv_urls = []
 
 
-def send_sms(wiadomosc):
+def send_sms(msg):
     client = Client(account_sid, auth_token)
-    message = client.messages.create(
-        body=wiadomosc,
-        from_=twilio_number,
-        to=my_phone_number
-    )
+    message = client.messages.create(body=msg, from_=twilio_number,
+                                     to=my_phone_number)
 
 
 def merge_rows(min_row, max_row):
     for j in range(min_row, max_row):
-        # zakres
         sheet.merge_cells('B{0}:C{0}'.format(j))
         sheet.merge_cells('D{0}:H{0}'.format(j))
         sheet.merge_cells('I{0}:V{0}'.format(j))
 
 
 def find_adv():
-    for i in range(1, liczba_stron):
+    for i in range(1, NUM_OF_PAGES):
         url + str(i)
         page = requests.get(url)
         soup = BeautifulSoup(page.text, 'html.parser')
@@ -38,9 +33,8 @@ def find_adv():
             if pages['href'] not in adv_urls:
                 if '/oferta/' in pages['href']:
                     adv_urls.append(pages['href'])
-    adv_list = soup.find(
-        "h1", {"data-testid": "results-heading"}).get_text(strip=True)
-    print(adv_list)
+    adv_list = soup.find("h1", {"data-testid": "results-heading"}
+                         ).get_text(strip=True)
     return adv_list
 
 
@@ -53,13 +47,12 @@ def main():
         find_adv()
 
     print(str(len(adv_urls)))
-
     print('Znaleziono:', len(adv_urls), 'ogłoszeń')
 
     try:
         wb = load_workbook(filename)
         sheet = wb.active
-    except BaseException:
+    except:
         wb = Workbook()
         sheet = wb.active
         merge_rows(min_row, max_row)
@@ -75,67 +68,60 @@ def main():
 
     print("Sprawdzanie ogłoszeń...")
     check_version = "ttid" or "1.9 ttid" or "1.9ttid"
-    did_combi = "kombi" or "combi" or "cabriolet" or "kabriolet" or "cabrio" or "Kabriolet"
+    did_combi = ("kombi" or "combi" or "cabriolet" or
+                 "kabriolet" or "cabrio" or "Kabriolet")
 
-    count_new = 0
     for elements in adv_urls:
-
         url = elements
         page = requests.get(url)
         soup = BeautifulSoup(page.text, 'html.parser')
 
         try:
-            version = soup.find(
-                text="Wersja").next_element.next_element.get_text(
-                strip=True).lower()
-        except BaseException:
+            version = soup.find(text="Wersja").next_element.next_element \
+                                              .get_text(strip=True).lower()
+        except:
             version = ' '
 
         try:
-            KM = soup.find(
-                text="Moc").next_element.next_element.get_text().strip()
-        except BaseException:
-
+            KM = soup.find(text="Moc") \
+                     .next_element.next_element.get_text().strip()
+        except:
             KM = ' '
-
         try:
-            desc = soup.find(
-                text="Opis").next_element.next_element.get_text().strip()
-        except BaseException:
+            desc = soup.find(text="Opis").next_element.next_element \
+                                         .get_text().strip()
+        except:
             desc = ' '
 
         try:
             title = soup.find(class_="tags").get_text().strip()
-        except BaseException:
+        except:
             title = ' '
 
-        if (KM == "180 KM" or KM == "210 KM") and (
-                check_version in version or check_version in desc or check_version in title):
+        if (KM == ("180 KM" or "210 KM") and
+            check_version in (version or desc or title)):
 
             try:
                 ID = soup.find(id="ad_id").get_text().strip()
-            except BaseException:
+            except:
                 pass
             try:
-                body_type = soup.find(
-                    text="Typ nadwozia").next_element.next_element.get_text(
-                    strip=True).lower()
+                body_type = soup.find(text="Typ nadwozia") \
+                                .next_element.next_element \
+                                .get_text(strip=True).lower()
 
-            except BaseException:
+            except:
                 body_type = " "
-
-            if did_combi not in desc or did_combi not in title or did_combi not in body_type or did_combi not in version:
+            if did_combi not in (desc or title or body_type or version):
                 for i in range(2, max):
-                    if sheet.cell(
-                            row=i, column=2).value is None and sheet.cell(
-                            row=i, column=1).value is None:
+                    if (sheet.cell(row=i, column=2).value and
+                        sheet.cell(row=i, column=1).value) is None:
                         if i == max - 1:
                             merge_rows(i, i + 1)
-                        sheet.cell(row=i, column=9).value = elements  # link
-                        sheet.cell(row=i, column=1).value = i - 1  # Lp
-                        sheet.cell(row=i, column=2).value = ID  # ID
-                        sheet.cell(
-                            row=i, column=4).value = "------------"  # title
+                        sheet.cell(row=i, column=9).value = elements  #link
+                        sheet.cell(row=i, column=1).value = i - 1 #Lp
+                        sheet.cell(row=i, column=2).value = ID   #ID
+                        sheet.cell(row=i, column=4).value = "----------" #title
                         max = sheet['BX1000'].value = max + 1
                         count_new = count_new + 1
                         send_sms(title_msg + elements)
@@ -146,8 +132,7 @@ def main():
                 x = x + 1
             else:
                 pass
-
-    print("Znaleziono {} wyników spełniających warunki.".format(x - 1))
+    print("Znaleziono {} wyników spełniających warunki.".format(x-1))
 
     if count_new == 0:
         print("Niestety nie znaleziono nowych ogłoszeń")
